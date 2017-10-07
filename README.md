@@ -103,3 +103,5 @@
 - TensorFlow YOLO object detection on Android [code](https://github.com/natanielruiz/android-yolo) 
 - Yolo_mark: GUI for marking bounded boxes of objects in images for training Yolo v2 [code](https://github.com/AlexeyAB/Yolo_mark) 
 - Contextual Priming and Feedback for Faster R-CNN [paper](http://abhinavsh.info/context_priming_feedback.pdf) 
+
+(Much thanks to [handong1587](https://handong1587.github.io/deep_learning/2015/10/09/object-detection.html))
