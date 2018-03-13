@@ -5,6 +5,7 @@
 - An Implementation of Faster RCNN with Study for Region Sampling [paper](https://arxiv.org/abs/1702.02138) [code](https://github.com/endernewton/tf-faster-rcnn) 
 - Learning Chained Deep Features and Classifiers for Cascade in Object Detection [paper](https://arxiv.org/abs/1702.07054) 
 - DeNet: Scalable Real-time Object Detection with Directed Sparse Sampling [paper](https://arxiv.org/abs/1703.10295) 
+- Mask RCNN [paper](https://arxiv.org/pdf/1703.06870.pdf)
 - A-Fast-RCNN: Hard Positive Generation via Adversary for Object Detection [paper](https://arxiv.org/abs/1704.03414) [paper](http://abhinavsh.info/papers/pdfs/adversarial_object_detection.pdf) [code](https://github.com/xiaolonw/adversarial-frcnn) 
 - Discriminative Bimodal Networks for Visual Localization and Detection with Natural Language Queries [paper](https://arxiv.org/abs/1704.03944) 
 - Spatial Memory for Context Reasoning in Object Detection [paper](https://arxiv.org/abs/1704.04224) 
