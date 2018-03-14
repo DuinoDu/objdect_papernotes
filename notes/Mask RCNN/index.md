@@ -1,6 +1,8 @@
 ---
 title: Mask RCNN
 date: "2018-03-13T00:00:00.000Z"
+publish_time: "2017.03"
+compare_method: [8,9]
 ---
 
 
@@ -45,7 +47,7 @@ date: "2018-03-13T00:00:00.000Z"
 
 &emsp;&emsp;上面两条支路得到proposal的类别得分、位置修正系数，第三条支路通过反卷积得到proposal对应的mask（不是整张图的mask，这是和语义分割的区别）。
 
-&emsp;&emsp;能够把序列任务并行的原因在于损失的计算。比如前面获取了300个proposal（或者SSD300中8732个box），class支路会得到(30081)的矩阵，计算分类损失。box支路会得到(3004)，注意了，这些矩阵并没有都参与计算位置修正损失，而是其中属于目标的那些proposal。 找到每个proposal分数最高对应的类别，对其中的80类目标（除去背景）对应的proposal，计算位置修正损失。
+&emsp;&emsp;能够把序列任务并行的原因在于损失的计算。比如前面获取了300个proposal（或者SSD300中8732个box），class支路会得到(300x81)的矩阵，计算分类损失。box支路会得到(300x4)，注意了，这些矩阵并没有都参与计算位置修正损失，而是其中属于目标的那些proposal。 找到每个proposal分数最高对应的类别，对其中的80类目标（除去背景）对应的proposal，计算位置修正损失。
 
 ![](formula1.png)
 
@@ -57,17 +59,57 @@ date: "2018-03-13T00:00:00.000Z"
 
 #### 2.3 RoIAlign
 
-RoIAlign是一个和预测mask没有直接联系的模块（之前一直以为仅mask支路需要用到RoIAlign，其实不然），它的作用是代替RoIPool，让这一步更加保留RoI的位置信息（分割问题对像素级位置很敏感）（为什么RoI会损失位置信息？它对结果有多大的影响？为什么以前的方法没有这个问题？这个需要单独一篇文字来思考）。从这里也能看出，RoIAlign对位置回归，也是有好处的。
+&emsp;&emsp;RoIAlign是一个和预测mask没有直接联系的模块（之前一直以为仅mask支路需要用到RoIAlign，其实不然），它的作用是代替RoIPool，让这一步更加保留RoI的位置信息（分割问题对像素级位置很敏感）（为什么RoI会损失位置信息？它对结果有多大的影响？为什么以前的方法没有这个问题？这个需要单独一篇文字来思考）。从这里也能看出，RoIAlign对位置回归，也是有好处的。
 
-从RoIPool到RoIAlign，完全是一个工程性的工作，结果确定的操作（这么做结果一定会好，只是代码写起来费劲，尤其要写GPU的版本）
+从RoIPool到RoIAlign，完全是一个工程性的工作，结果确定的操作（这么做结果一定会好，只是代码写起来费劲，尤其要写GPU的版本）。（关于RoIAlign的详细理解，从原理到代码实现，需要一篇文字的思考，这里省略。）
+
+### 3. 一些想法
+
+&emsp;&emsp;和本文最相关的两篇文章MNC[^8]和FCIS[^9]，这三篇文章分别是COCO分割比赛，2015-2017年的第一名解决方案。其实实例分割是COCO分割比赛提出的，并不是本文MaskRCNN提出的，MNC是第一篇用CNN处理实例分割的方法。本文的工作，用作者的话说，是一个baseline，在fasterRCNN的助力下，MaskRCNN把coco实例分割的结果（AP）从24.6，提升到37.1，是一个非常好的baseline。
+
+&emsp;&emsp;本文的另一点值得思考的是，作者认为，目标检测、实例化分割、关键点这三个任务，都属于**instance-level**任务，其他instance-level任务，也可以用MaskRCNN这样的解决思路去解决，本文实际上是提出了一个instance-level任务的通用解决方案，如下图。
+
+![](instance.png)
+
+”instance-level任务“的意思是，对于从场景图片中获得的一个一个instance，你想知道的关于它的一切信息：
+
+- 它是什么对象？
+- 它在场景中的位置？
+- 它的精确轮廓？
+- 它的骨架？（针对特定对象）
+- 它的空间姿态（roll,pitch,yaw）？
+- 它的精细化属性？
+- 它的文本描述？
+- 它和场景的关系？（可能不属于instance-level任务）
+- 其他......
+
+所有这些任务，都可以用一种改进的FasterRCNN来完成，本文则是沿着这个方向，踏出的第一步。FasterRCNN可能并不仅仅是一个目标检测算法，而会是通向**AI完全理解自然场景**的有利途径。
+
+&emsp;&emsp;另外，以上都是基于监督学习的，对于后面这些任务，标注信息的获取难度有些大，因此”半监督学习“会在这里起到非常大的用处，也是目前的一大研究热点[^10]。
+
+&emsp;&emsp;从这个角度来看一阶段和二阶段目标检测的区别。一阶段和二阶段的差别，体现在上图的淡黄色框中，没有”RoI生成器“和"pooling"两个操作，直接从default box得到结果。所以问题来了，能够用一阶段的方法做”instance-level任务“的通用解决方案呢？
+
+&emsp;&emsp;instance-level任务的前提条件是，能够获得高质量的RoI。default box是均匀分布的框，对目标完全是未知的，所有数量必须要很多才能涵盖目标可能的各种情况。
+
+- 从分类的角度看，这是很不利的，因为负样本太多太多了。
+- 从位置修正看，这很好，因为default box尽可能多地保留了位置信息。
+- 从分割的角度看，也很好，理由同上。
+- 从关键点看，难说。
+- 从剩下的任务看，取决于这个任务更偏重位置信息，还是语义信息。
+
+### 4. 对标方法
+
+1. ​
 
 
-
-
-[^1]: Imagenet classification with deep convolutional neural networks 
+[^1]: Imagenet classification with deep convolutional neural networks
 [^2]: Deep neural networks for object detection
 [^3]: Rich feature hierarchies for accurate object detection and semantic segmentation
 [^4]: Scalable Object Detection using Deep Neural Networks
 [^5]: OverFeat: Integrated Recognition, Localization and Detection using Convolutional Networks
 [^6]: Fully Convolutional Networks for Semantic Segmentation
 [^7]: Microsoft COCO: Common Objects in Context
+[^8]: Instance-aware semantic segmentation via multi-task network cascades
+[^9]: Fully convolutional instance-aware semantic segmentation
+[^10]: Learning to Segment Every Thing
+
